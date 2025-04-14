@@ -8,13 +8,14 @@ export class Game extends Scene {
 
   strongman: Phaser.GameObjects.Sprite;
   log: Phaser.Physics.Matter.Image;
+  ghostLog: Phaser.Physics.Matter.Image;
+  boxes: Phaser.Physics.Matter.Image[];
 
-  logWidth: number = 64;
-  logHeight: number = 18;
+  logWidth: number = 96;
+  logHeight: number = 20;
 
   logXInertia: number = 0;
   logYInertia: number = 0;
-  logAngle: number = 0;
   cursors: Phaser.Types.Input.Keyboard.CursorKeys;
 
   isGameOver: boolean = false;
@@ -23,7 +24,6 @@ export class Game extends Scene {
     super("Game");
     this.logXInertia = 0;
     this.logYInertia = 0;
-    this.logAngle = 0;
   }
 
   create() {
@@ -42,6 +42,10 @@ export class Game extends Scene {
       .setOrigin(0.5);
     this.strongman.setScale(4);
     this.strongman.setDepth(1);
+
+    const logCategory = this.matter.world.nextCategory();
+    const ghostLogCategory = this.matter.world.nextCategory();
+    const boxCategory = this.matter.world.nextCategory();
 
     // Set bounds for world physics
     this.matter.world.setBounds(
@@ -75,10 +79,65 @@ export class Game extends Scene {
     this.log.setOrigin(0.5);
     this.log.setBounce(0);
     this.log.setAngle(0);
+    this.log.setDensity(1000);
+    this.log.setCollisionCategory(logCategory);
+
+    // Ghost log (static and invisible)
+    this.ghostLog = this.matter.add.image(
+      this.log.x,
+      this.log.y,
+      "log-wide",
+      undefined,
+      {
+        shape: {
+          type: "rectangle",
+          width: this.logWidth,
+          height: this.logHeight,
+        },
+      }
+    );
+    this.ghostLog.setScale(4);
+    this.ghostLog.setStatic(true); // Make the ghost log immovable
+    this.ghostLog.setVisible(false); // Hide the ghost log
+    this.ghostLog.setCollisionCategory(ghostLogCategory);
+    this.ghostLog.setCollidesWith([boxCategory]); // Only collide with boxes
 
     this.logXInertia = 0;
     this.logYInertia = 0;
     this.isGameOver = false;
+
+    // add between 1-3 boxes on top of the log, these are controlled by matter physics
+    const boxCount = Phaser.Math.Between(1, 5);
+
+    this.boxes = Array.from({ length: boxCount }, (_, i) => {
+      const box = this.matter.add.image(
+        this.log.x,
+        this.log.y - this.logHeight * 2 - 100 * i,
+        "box",
+        undefined,
+        {
+          shape: {
+            type: "rectangle",
+            width: 16,
+            height: 16,
+          },
+        }
+      );
+      box.setScale(4);
+      box.setOrigin(0.5);
+      box.setFrictionAir(0);
+      box.setMass(0.0001);
+      box.setBounce(0);
+      box.setAngle(0);
+      box.setIgnoreGravity(false);
+      box.setVelocity(0, 0);
+      box.setAngularVelocity(0);
+
+      box.setCollisionCategory(boxCategory);
+      // Disable collisions between boxes and the main log
+      box.setCollidesWith([ghostLogCategory, boxCategory]); // Only collide with the ghost log
+      return box;
+    });
 
     // Keyboard input
     this.cursors = this.input.keyboard.createCursorKeys();
@@ -110,6 +169,12 @@ export class Game extends Scene {
 
     if (!this.isGameOver) {
       this.strongman.setPosition(Xposition, this.strongman.y);
+
+      this.boxes.forEach((box) => {
+        // Update boxes position relative to the log while the game is not over
+        const boxPosition = box.x + this.log.angle * 0.05;
+        box.setPosition(boxPosition, box.y);
+      });
     }
 
     if (!this.isGameOver && (this.log.angle > 25 || this.log.angle < -25)) {
@@ -123,6 +188,9 @@ export class Game extends Scene {
       console.log("Log is touching ground");
       this.log.setVelocity(0, 0);
     }
+
+    this.ghostLog.setPosition(this.log.x, this.log.y);
+    this.ghostLog.setAngle(this.log.angle);
   }
 
   changeScene() {
