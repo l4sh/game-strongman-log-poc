@@ -202,6 +202,10 @@ export class Game extends Scene {
 
     if (!this.isGameOver) {
       // Even if cursors are not pressed the log should keep moving
+      if (this.logXInertia === 0) {
+        this.logXInertia = (Math.random() - 0.5) / 10;
+      }
+
       this.logXInertia *= 1.01;
       this.log.setAngularVelocity(this.logXInertia / 100);
 
@@ -234,12 +238,12 @@ export class Game extends Scene {
 
     // Positions used to trigger walk forward and backward
     const strongmanForwardPos = (this.game.config.height as number) / 2 + 120; // 120
-    const strongmanBackwardPos = (this.game.config.height as number) / 2 + 140;
+    const strongmanBackwardPos = (this.game.config.height as number) / 2 + 155;
 
     if (
       !this.isGameOver &&
       (this.strongman.y < strongmanForwardPos - 100 ||
-        this.strongman.y > strongmanBackwardPos + 100)
+        this.strongman.y > strongmanBackwardPos + 50)
     ) {
       // Jiggle the log if player goes too far forwards or backwards
       const newAngularVelocity = Math.random() - 0.5;
@@ -259,13 +263,15 @@ export class Game extends Scene {
       this.visualLines.forEach((line) => {
         const isStrongmanAdvancing = this.strongman.y < strongmanForwardPos;
 
-        const ySpeedRatio = isStrongmanAdvancing
+        let ySpeedRatio = isStrongmanAdvancing
           ? strongmanForwardPos / this.strongman.y
           : this.strongman.y / strongmanBackwardPos;
+        ySpeedRatio *= 1.5;
+        console.log("ySpeedRatio", ySpeedRatio);
         // If the strongman is moving forward, the lines should separate otherwise they should come together
         let xDiff = line.x < halfScreenX ? -1 : 1;
         xDiff = isStrongmanAdvancing ? xDiff : -xDiff;
-        const yDiff = this.strongman.y < strongmanForwardPos ? 1 : -1;
+        const yDiff = this.strongman.y < strongmanForwardPos ? 1.1 : -1.1;
         line.setPosition(line.x + xDiff * 0.2, line.y + yDiff * ySpeedRatio);
       });
     }
