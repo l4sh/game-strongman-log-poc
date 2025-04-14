@@ -23,6 +23,8 @@ export class Game extends Scene {
   strongmanYInertia: number = 0;
   strongmanXInertia: number = 0;
 
+  visualLines: Phaser.GameObjects.Sprite[] = [];
+
   cursors: Phaser.Types.Input.Keyboard.CursorKeys;
 
   isGameOver: boolean = false;
@@ -150,6 +152,26 @@ export class Game extends Scene {
       return box;
     });
 
+    //
+
+    const lineCount = 6;
+
+    this.visualLines = Array.from({ length: lineCount }, (_, i) => {
+      // X Position is random but between 0.33 and 0.66 of the screen
+      const Yoffset = (this.game.config.height as number) * 0.6;
+
+      let posX = (this.game.config.width as number) * 0.5;
+      posX += i % 2 === 0 ? -30 * i : 30 * i;
+      const posY = Yoffset + i * 50;
+
+      const line = this.add.sprite(posX, posY, "line");
+
+      line.setOrigin(0.5);
+      line.setScale(3);
+      line.setAlpha(0.5);
+      return line;
+    });
+
     // Keyboard input
     this.cursors = this.input.keyboard.createCursorKeys();
 
@@ -210,17 +232,57 @@ export class Game extends Scene {
       this.isGameOver = true;
     }
 
+    // Positions used to trigger walk forward and backward
+    const strongmanForwardPos = (this.game.config.height as number) / 2 + 120; // 120
+    const strongmanBackwardPos = (this.game.config.height as number) / 2 + 140;
+
     if (
       !this.isGameOver &&
-      (this.strongman.y < (this.game.config.height as number) / 2 ||
-        this.strongman.y >
-          (this.game.config.height as number) / 2 + this.logHeight * 10)
+      (this.strongman.y < strongmanForwardPos - 100 ||
+        this.strongman.y > strongmanBackwardPos + 100)
     ) {
       // Jiggle the log if player goes too far forwards or backwards
       const newAngularVelocity = Math.random() - 0.5;
 
       this.log.setAngularVelocity(newAngularVelocity);
     }
+
+    const halfScreenX = (this.game.config.width as number) / 2;
+
+    if (
+      !this.isGameOver &&
+      (this.strongman.y < strongmanForwardPos ||
+        this.strongman.y > strongmanBackwardPos)
+    ) {
+      // Strongman moves forward, lines move down
+
+      this.visualLines.forEach((line) => {
+        const isStrongmanAdvancing = this.strongman.y < strongmanForwardPos;
+
+        const ySpeedRatio = isStrongmanAdvancing
+          ? strongmanForwardPos / this.strongman.y
+          : this.strongman.y / strongmanBackwardPos;
+        // If the strongman is moving forward, the lines should separate otherwise they should come together
+        let xDiff = line.x < halfScreenX ? -1 : 1;
+        xDiff = isStrongmanAdvancing ? xDiff : -xDiff;
+        const yDiff = this.strongman.y < strongmanForwardPos ? 1 : -1;
+        line.setPosition(line.x + xDiff * 0.2, line.y + yDiff * ySpeedRatio);
+      });
+    }
+
+    // Move lines to the top if they go out of bounds
+    this.visualLines.forEach((line) => {
+      const newTopXPos =
+        line.x < halfScreenX ? halfScreenX - 0.1 : halfScreenX + 0.1;
+      const newBottomXPos =
+        line.x > halfScreenX ? halfScreenX + 100 : halfScreenX - 100;
+      if (line.y > (this.game.config.height as number)) {
+        line.setPosition(newTopXPos, (this.game.config.height as number) * 0.6);
+      } else if (line.y < (this.game.config.height as number) * 0.6) {
+        line.setPosition(newBottomXPos, this.game.config.height as number);
+      }
+    });
+    // if (this.strongmanYInertia > 0.5) {
 
     // // If log is touching ground, stop it
     // if (this.log.y > (this.game.config.height as number) - this.logHeight * 8) {

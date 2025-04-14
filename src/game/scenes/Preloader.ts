@@ -34,6 +34,7 @@ export class Preloader extends Scene {
     this.load.image("log", "log.png");
     this.load.image("log-wide", "log-wide.png");
     this.load.image("box", "box.png");
+    this.load.image("line", "line.png");
   }
 
   create() {
