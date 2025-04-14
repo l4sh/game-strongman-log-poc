@@ -1,6 +1,9 @@
 import { EventBus } from "../EventBus";
 import { Scene } from "phaser";
 
+const X_INERTIA = 0.05;
+const Y_INERTIA = 0.05;
+
 export class Game extends Scene {
   camera: Phaser.Cameras.Scene2D.Camera;
   background: Phaser.GameObjects.Image;
@@ -16,6 +19,10 @@ export class Game extends Scene {
 
   logXInertia: number = 0;
   logYInertia: number = 0;
+
+  strongmanYInertia: number = 0;
+  strongmanXInertia: number = 0;
+
   cursors: Phaser.Types.Input.Keyboard.CursorKeys;
 
   isGameOver: boolean = false;
@@ -54,7 +61,7 @@ export class Game extends Scene {
       0,
       0,
       this.game.config.width as number,
-      (this.game.config.height as number) * 0.9 // 90% so the log seems to fall right behind the strongman
+      (this.game.config.height as number) * 0.97 // 90% so the log seems to fall right behind the strongman
     );
 
     this.log = this.matter.add.image(
@@ -106,6 +113,8 @@ export class Game extends Scene {
 
     this.logXInertia = 0;
     this.logYInertia = 0;
+    this.strongmanYInertia = 0;
+    this.strongmanXInertia = 0;
     this.isGameOver = false;
 
     // add between 1-3 boxes on top of the log, these are controlled by matter physics
@@ -151,27 +160,43 @@ export class Game extends Scene {
     // Make inertia grow over time
 
     if (this.cursors.left.isDown && !this.isGameOver) {
-      this.logXInertia -= 0.1;
+      this.logXInertia -= X_INERTIA;
       this.log.setAngularVelocity(this.logXInertia / 100);
     } else if (this.cursors.right.isDown && !this.isGameOver) {
-      this.logXInertia += 0.1;
+      this.logXInertia += X_INERTIA;
       this.log.setAngularVelocity(this.logXInertia / 100);
+    }
+
+    if (this.cursors.up.isDown && !this.isGameOver) {
+      this.strongmanYInertia -= Y_INERTIA;
+      this.logYInertia -= Y_INERTIA;
+    } else if (this.cursors.down.isDown && !this.isGameOver) {
+      this.strongmanYInertia += Y_INERTIA;
+      this.logYInertia += Y_INERTIA;
+    } else if (this.cursors.space.isDown && !this.isGameOver) {
+      this.strongmanYInertia = 0;
+      this.logYInertia = 0;
     }
 
     if (!this.isGameOver) {
       // Even if cursors are not pressed the log should keep moving
       this.logXInertia *= 1.01;
       this.log.setAngularVelocity(this.logXInertia / 100);
+
+      this.logYInertia *= 1.01;
+      this.strongmanYInertia *= 1.01;
     }
 
     // Depending on logXInertia update the x position of the log and the strongman
     const Xposition = this.log.x + this.log.angle * 0.05;
     // this.log.setPosition(this.log.x + this.logXInertia, this.log.y);
-    this.log.setPosition(Xposition, this.log.y);
+    const strongmanYPosition = this.strongman.y + this.strongmanYInertia;
+    const logYPosition = this.log.y + (this.isGameOver ? 0 : this.logYInertia);
+
+    this.log.setPosition(Xposition, logYPosition); // Update log's Y position based on inertia
 
     if (!this.isGameOver) {
-      this.strongman.setPosition(Xposition, this.strongman.y);
-
+      this.strongman.setPosition(Xposition, strongmanYPosition);
       this.boxes.forEach((box) => {
         // Update boxes position relative to the log while the game is not over
         const boxPosition = box.x + this.log.angle * 0.05;
@@ -185,11 +210,23 @@ export class Game extends Scene {
       this.isGameOver = true;
     }
 
-    // If log is touching ground, stop it
-    if (this.log.y > (this.game.config.height as number) - this.logHeight * 6) {
-      console.log("Log is touching ground");
-      this.log.setVelocity(0, 0);
+    if (
+      !this.isGameOver &&
+      (this.strongman.y < (this.game.config.height as number) / 2 ||
+        this.strongman.y >
+          (this.game.config.height as number) / 2 + this.logHeight * 10)
+    ) {
+      // Jiggle the log if player goes too far forwards or backwards
+      const newAngularVelocity = Math.random() - 0.5;
+
+      this.log.setAngularVelocity(newAngularVelocity);
     }
+
+    // // If log is touching ground, stop it
+    // if (this.log.y > (this.game.config.height as number) - this.logHeight * 8) {
+    //   console.log("Log is touching ground");
+    //   this.log.setVelocity(0, 0);
+    // }
 
     this.ghostLog.setPosition(this.log.x, this.log.y);
     this.ghostLog.setAngle(this.log.angle);
